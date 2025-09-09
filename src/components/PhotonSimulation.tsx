@@ -38,6 +38,8 @@ interface SceneProps extends PhotonSimulationProps {
 
 const SPHERE_RADIUS = 3.5; // Increased from 2.5
 const MAX_DISTANCE = 25;
+const MAX_TRAIL_SEGMENTS = 2000;
+const DISTANCE_THRESHOLD = 0.1; // Increased from 0.05
 
 function Photon({ 
   photon, 
@@ -91,9 +93,9 @@ function Photon({
       newPhoton.distanceFromCenter = newPhoton.position.length();
     }
 
-    // Add to path immutably
+    // Add to path immutably with increased threshold
     if (newPhoton.path.length === 0 || 
-        newPhoton.path[newPhoton.path.length - 1].distanceTo(newPhoton.position) > 0.05) {
+        newPhoton.path[newPhoton.path.length - 1].distanceTo(newPhoton.position) > DISTANCE_THRESHOLD) {
       newPhoton.path = [...newPhoton.path, newPhoton.position.clone()];
     }
 
@@ -105,73 +107,96 @@ function Photon({
     }
   });
 
-  // Create path lines
-  const pathLines = useMemo(() => {
-    console.log(`Photon ${photon.id} path length:`, photon.path.length, 'isPaused:', isPaused);
+  const lineRef = useRef<THREE.Line>();
+  const positionsRef = useRef<Float32Array>();
+  const geometryRef = useRef<THREE.BufferGeometry>();
+  const materialRef = useRef<THREE.LineBasicMaterial>();
+
+  // Initialize line object once
+  useEffect(() => {
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(MAX_TRAIL_SEGMENTS * 2 * 3);
+    const material = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false
+    });
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(MAX_TRAIL_SEGMENTS * 2 * 3), 3));
+    
+    const line = new THREE.Line(geometry, material);
+    
+    lineRef.current = line;
+    positionsRef.current = positions;
+    geometryRef.current = geometry;
+    materialRef.current = material;
+    
+    return () => {
+      geometry.dispose();
+      material.dispose();
+    };
+  }, []);
+
+  // Update line geometry when path changes
+  useEffect(() => {
+    if (!lineRef.current || !positionsRef.current || !geometryRef.current) return;
     
     const ensureTwoPoints = (arr: THREE.Vector3[]) =>
       arr.length >= 2 ? arr : arr.length === 1 ? [arr[0], arr[0].clone()] : [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0)];
     
     const pts = ensureTwoPoints(photon.path);
+    const positions = positionsRef.current;
+    const geometry = geometryRef.current;
+    const colorAttribute = geometry.getAttribute('color') as THREE.BufferAttribute;
     
-    const lines: JSX.Element[] = [];
+    const segmentCount = Math.min(pts.length - 1, MAX_TRAIL_SEGMENTS);
     
-    for (let i = 0; i < pts.length - 1; i++) {
+    for (let i = 0; i < segmentCount; i++) {
       const start = pts[i];
       const end = pts[i + 1];
+      const offset = i * 6;
+      const colorOffset = i * 6;
       
-      const geometry = new THREE.BufferGeometry();
-      const positions = new Float32Array([
-        start.x, start.y, start.z,
-        end.x, end.y, end.z
-      ]);
-      const positionAttribute = new THREE.BufferAttribute(positions, 3);
-      geometry.setAttribute('position', positionAttribute);
+      // Set positions
+      positions[offset] = start.x;
+      positions[offset + 1] = start.y;
+      positions[offset + 2] = start.z;
+      positions[offset + 3] = end.x;
+      positions[offset + 4] = end.y;
+      positions[offset + 5] = end.z;
       
-      // Mark geometry as dirty to ensure proper rendering
-      positionAttribute.needsUpdate = true;
-      geometry.computeBoundingSphere();
-      
+      // Set colors
       const distanceFromCenter = start.length();
       let color: THREE.Color;
-      let opacity = 1.0; // Always fully visible
       
       if (distanceFromCenter <= SPHERE_RADIUS) {
-        // Inside sphere: gradient from dark red to bright orange
         const t = distanceFromCenter / SPHERE_RADIUS;
         color = new THREE.Color().lerpColors(
-          new THREE.Color(0x370307), // photon-start
-          new THREE.Color(0xc85e0a), // photon-end
+          new THREE.Color(0x370307),
+          new THREE.Color(0xc85e0a),
           t
         );
       } else {
-        // Outside sphere: bright orange fading with distance
         color = new THREE.Color(0xc85e0a);
         const fadeDistance = Math.max(0, (distanceFromCenter - SPHERE_RADIUS) / 10);
-        opacity = Math.max(0.1, Math.exp(-fadeDistance)); // Keep fade-out effect but remove transparency control
+        const fade = Math.max(0.1, Math.exp(-fadeDistance));
+        color.multiplyScalar(fade);
       }
       
-      const material = new THREE.LineBasicMaterial({
-        color: color,
-        transparent: opacity < 1,
-        opacity: opacity,
-        linewidth: 1,
-        visible: true,
-      });
-      
-      console.log(`Creating line segment ${i} for photon ${photon.id} with opacity:`, opacity, 'color:', color.getHexString());
-      
-      lines.push(
-        <primitive 
-          key={`photon-${photon.id}-segment-${i}`}
-          object={new THREE.Line(geometry, material)} 
-        />
-      );
+      colorAttribute.array[colorOffset] = color.r;
+      colorAttribute.array[colorOffset + 1] = color.g;
+      colorAttribute.array[colorOffset + 2] = color.b;
+      colorAttribute.array[colorOffset + 3] = color.r;
+      colorAttribute.array[colorOffset + 4] = color.g;
+      colorAttribute.array[colorOffset + 5] = color.b;
     }
     
-    console.log(`Photon ${photon.id} created ${lines.length} line segments`);
-    return lines;
-  }, [photon.id, photon.path, photon.path.length]);
+    geometry.setDrawRange(0, segmentCount * 2);
+    geometry.attributes.position.needsUpdate = true;
+    geometry.attributes.color.needsUpdate = true;
+    geometry.computeBoundingSphere();
+  }, [photon.path.length]);
 
   return (
     <group>
@@ -187,7 +212,7 @@ function Photon({
       
       {/* Path trail */}
       <group ref={pathGroupRef}>
-        {pathLines}
+        {lineRef.current && <primitive object={lineRef.current} />}
       </group>
     </group>
   );
@@ -208,35 +233,60 @@ function Sun({ transparency }: { transparency: number }) {
 }
 
 function TrailRenderer({ trail, settings }: { trail: PhotonTrail; settings: PhotonSimulationProps['settings'] }) {
-  const pathLines = useMemo(() => {
-    console.log(`Trail ${trail.id} path length:`, trail.path.length);
+  const lineRef = useRef<THREE.Line>();
+  const positionsRef = useRef<Float32Array>();
+  const geometryRef = useRef<THREE.BufferGeometry>();
+  const materialRef = useRef<THREE.LineBasicMaterial>();
+  const isInitialized = useRef(false);
+
+  // Initialize line object once and freeze it (completed trail)
+  useEffect(() => {
+    if (isInitialized.current) return;
     
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(MAX_TRAIL_SEGMENTS * 2 * 3);
+    const material = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false
+    });
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(MAX_TRAIL_SEGMENTS * 2 * 3), 3));
+    
+    const line = new THREE.Line(geometry, material);
+    
+    lineRef.current = line;
+    positionsRef.current = positions;
+    geometryRef.current = geometry;
+    materialRef.current = material;
+    
+    // Build trail geometry once (frozen trail)
     const ensureTwoPoints = (arr: THREE.Vector3[]) =>
       arr.length >= 2 ? arr : arr.length === 1 ? [arr[0], arr[0].clone()] : [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0)];
     
     const tpts = ensureTwoPoints(trail.path);
+    const colorAttribute = geometry.getAttribute('color') as THREE.BufferAttribute;
     
-    const lines: JSX.Element[] = [];
+    const segmentCount = Math.min(tpts.length - 1, MAX_TRAIL_SEGMENTS);
     
-    for (let i = 0; i < tpts.length - 1; i++) {
+    for (let i = 0; i < segmentCount; i++) {
       const start = tpts[i];
       const end = tpts[i + 1];
+      const offset = i * 6;
+      const colorOffset = i * 6;
       
-      const geometry = new THREE.BufferGeometry();
-      const positions = new Float32Array([
-        start.x, start.y, start.z,
-        end.x, end.y, end.z
-      ]);
-      const positionAttribute = new THREE.BufferAttribute(positions, 3);
-      geometry.setAttribute('position', positionAttribute);
+      // Set positions
+      positions[offset] = start.x;
+      positions[offset + 1] = start.y;
+      positions[offset + 2] = start.z;
+      positions[offset + 3] = end.x;
+      positions[offset + 4] = end.y;
+      positions[offset + 5] = end.z;
       
-      // Mark geometry as dirty to ensure proper rendering
-      positionAttribute.needsUpdate = true;
-      geometry.computeBoundingSphere();
-      
+      // Set colors
       const distanceFromCenter = start.length();
       let color: THREE.Color;
-      let opacity = 1.0; // Always fully visible
       
       if (distanceFromCenter <= SPHERE_RADIUS) {
         const t = distanceFromCenter / SPHERE_RADIUS;
@@ -248,29 +298,32 @@ function TrailRenderer({ trail, settings }: { trail: PhotonTrail; settings: Phot
       } else {
         color = new THREE.Color(0xc85e0a);
         const fadeDistance = Math.max(0, (distanceFromCenter - SPHERE_RADIUS) / 10);
-        opacity = Math.max(0.1, Math.exp(-fadeDistance)); // Keep fade-out effect but remove transparency control
+        const fade = Math.max(0.1, Math.exp(-fadeDistance));
+        color.multiplyScalar(fade);
       }
       
-      const material = new THREE.LineBasicMaterial({
-        color: color,
-        transparent: opacity < 1,
-        opacity: opacity,
-        linewidth: 1,
-        visible: true,
-      });
-      
-      lines.push(
-        <primitive 
-          key={`trail-${trail.id}-segment-${i}`}
-          object={new THREE.Line(geometry, material)} 
-        />
-      );
+      colorAttribute.array[colorOffset] = color.r;
+      colorAttribute.array[colorOffset + 1] = color.g;
+      colorAttribute.array[colorOffset + 2] = color.b;
+      colorAttribute.array[colorOffset + 3] = color.r;
+      colorAttribute.array[colorOffset + 4] = color.g;
+      colorAttribute.array[colorOffset + 5] = color.b;
     }
     
-    return lines;
-  }, [trail.id, trail.path, trail.path.length]);
+    geometry.setDrawRange(0, segmentCount * 2);
+    geometry.attributes.position.needsUpdate = true;
+    geometry.attributes.color.needsUpdate = true;
+    geometry.computeBoundingSphere();
+    
+    isInitialized.current = true;
+    
+    return () => {
+      geometry.dispose();
+      material.dispose();
+    };
+  }, []);
 
-  return <group>{pathLines}</group>;
+  return <group>{lineRef.current && <primitive object={lineRef.current} />}</group>;
 }
 
 function Scene({ settings, photons, trails, isPaused, onPhotonsUpdate, cameraDistance }: SceneProps) {
@@ -419,8 +472,14 @@ export default function PhotonSimulation({ settings, photons, trails, isPaused, 
   return (
     <div className="w-full h-full solar-gradient relative">
       <Canvas
-        camera={{ position: [0, 0, 10], fov: 50 }} // Match initial cameraDistance
-        gl={{ antialias: true, alpha: true }}
+        camera={{ position: [0, 0, 10], fov: 50 }}
+        gl={{ 
+          antialias: false, // Optimized: disable for performance
+          alpha: true
+        }}
+        onCreated={({ gl }) => {
+          gl.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        }}
         style={{ background: 'transparent' }}
       >
         <Scene 
