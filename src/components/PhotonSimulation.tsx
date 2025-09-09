@@ -124,7 +124,12 @@ function Photon({
         start.x, start.y, start.z,
         end.x, end.y, end.z
       ]);
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const positionAttribute = new THREE.BufferAttribute(positions, 3);
+      geometry.setAttribute('position', positionAttribute);
+      
+      // Mark geometry as dirty to ensure proper rendering
+      positionAttribute.needsUpdate = true;
+      geometry.computeBoundingSphere();
       
       const distanceFromCenter = start.length();
       let color: THREE.Color;
@@ -204,20 +209,32 @@ function Sun({ transparency }: { transparency: number }) {
 function TrailRenderer({ trail, settings }: { trail: PhotonTrail; settings: PhotonSimulationProps['settings'] }) {
   const pathLines = useMemo(() => {
     console.log(`Trail ${trail.id} path length:`, trail.path.length);
-    if (trail.path.length < 2) return [];
+    
+    // Ensure trail has at least 2 points for visibility
+    let processedPath = [...trail.path];
+    if (processedPath.length < 2 && processedPath.length > 0) {
+      // Duplicate the starting position to create a minimal visible line
+      processedPath.push(processedPath[0].clone());
+    }
+    if (processedPath.length < 2) return [];
     
     const lines: JSX.Element[] = [];
     
-    for (let i = 0; i < trail.path.length - 1; i++) {
-      const start = trail.path[i];
-      const end = trail.path[i + 1];
+    for (let i = 0; i < processedPath.length - 1; i++) {
+      const start = processedPath[i];
+      const end = processedPath[i + 1];
       
       const geometry = new THREE.BufferGeometry();
       const positions = new Float32Array([
         start.x, start.y, start.z,
         end.x, end.y, end.z
       ]);
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const positionAttribute = new THREE.BufferAttribute(positions, 3);
+      geometry.setAttribute('position', positionAttribute);
+      
+      // Mark geometry as dirty to ensure proper rendering
+      positionAttribute.needsUpdate = true;
+      geometry.computeBoundingSphere();
       
       const distanceFromCenter = start.length();
       let color: THREE.Color;
@@ -311,8 +328,18 @@ function Scene({ settings, photons, trails, isPaused, onPhotonsUpdate, cameraDis
     const activePhotons = photons.filter(p => p.distanceFromCenter < MAX_DISTANCE);
     const removedPhotons = photons.filter(p => p.distanceFromCenter >= MAX_DISTANCE);
     
-    // Convert removed photons to trails
-    const newTrails = removedPhotons.map(p => ({ id: p.id, path: [...p.path] }));
+    // Convert removed photons to trails, ensuring they have at least 2 points
+    const newTrails = removedPhotons.map(p => {
+      let trailPath = [...p.path];
+      // Ensure trail has at least 2 points for immediate visibility
+      if (trailPath.length < 2 && trailPath.length > 0) {
+        trailPath.push(trailPath[0].clone());
+      } else if (trailPath.length === 0) {
+        // Fallback: create a minimal trail at the photon's last position
+        trailPath = [p.position.clone(), p.position.clone()];
+      }
+      return { id: p.id, path: trailPath };
+    });
     
     // If we removed photons (they went too far), add a new one to maintain at least 1
     if (activePhotons.length < photons.length && activePhotons.length === 0) {
