@@ -91,10 +91,10 @@ function Photon({
       newPhoton.distanceFromCenter = newPhoton.position.length();
     }
 
-    // Add to path
+    // Add to path immutably
     if (newPhoton.path.length === 0 || 
         newPhoton.path[newPhoton.path.length - 1].distanceTo(newPhoton.position) > 0.05) {
-      newPhoton.path.push(newPhoton.position.clone());
+      newPhoton.path = [...newPhoton.path, newPhoton.position.clone()];
     }
 
     onUpdate(newPhoton);
@@ -108,16 +108,17 @@ function Photon({
   // Create path lines
   const pathLines = useMemo(() => {
     console.log(`Photon ${photon.id} path length:`, photon.path.length, 'isPaused:', isPaused);
-    if (photon.path.length < 2) {
-      console.log(`Photon ${photon.id} has insufficient path points`);
-      return [];
-    }
+    
+    const ensureTwoPoints = (arr: THREE.Vector3[]) =>
+      arr.length >= 2 ? arr : arr.length === 1 ? [arr[0], arr[0].clone()] : [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0)];
+    
+    const pts = ensureTwoPoints(photon.path);
     
     const lines: JSX.Element[] = [];
     
-    for (let i = 0; i < photon.path.length - 1; i++) {
-      const start = photon.path[i];
-      const end = photon.path[i + 1];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const start = pts[i];
+      const end = pts[i + 1];
       
       const geometry = new THREE.BufferGeometry();
       const positions = new Float32Array([
@@ -170,7 +171,7 @@ function Photon({
     
     console.log(`Photon ${photon.id} created ${lines.length} line segments`);
     return lines;
-  }, [photon.path, photon.id]);
+  }, [photon.id, photon.path, photon.path.length]);
 
   return (
     <group>
@@ -210,19 +211,16 @@ function TrailRenderer({ trail, settings }: { trail: PhotonTrail; settings: Phot
   const pathLines = useMemo(() => {
     console.log(`Trail ${trail.id} path length:`, trail.path.length);
     
-    // Ensure trail has at least 2 points for visibility
-    let processedPath = [...trail.path];
-    if (processedPath.length < 2 && processedPath.length > 0) {
-      // Duplicate the starting position to create a minimal visible line
-      processedPath.push(processedPath[0].clone());
-    }
-    if (processedPath.length < 2) return [];
+    const ensureTwoPoints = (arr: THREE.Vector3[]) =>
+      arr.length >= 2 ? arr : arr.length === 1 ? [arr[0], arr[0].clone()] : [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0)];
+    
+    const tpts = ensureTwoPoints(trail.path);
     
     const lines: JSX.Element[] = [];
     
-    for (let i = 0; i < processedPath.length - 1; i++) {
-      const start = processedPath[i];
-      const end = processedPath[i + 1];
+    for (let i = 0; i < tpts.length - 1; i++) {
+      const start = tpts[i];
+      const end = tpts[i + 1];
       
       const geometry = new THREE.BufferGeometry();
       const positions = new Float32Array([
@@ -270,7 +268,7 @@ function TrailRenderer({ trail, settings }: { trail: PhotonTrail; settings: Phot
     }
     
     return lines;
-  }, [trail.path, trail.id]);
+  }, [trail.id, trail.path, trail.path.length]);
 
   return <group>{pathLines}</group>;
 }
@@ -343,16 +341,20 @@ function Scene({ settings, photons, trails, isPaused, onPhotonsUpdate, cameraDis
     
     // If we removed photons (they went too far), add a new one to maintain at least 1
     if (activePhotons.length < photons.length && activePhotons.length === 0) {
-      // Create a new photon at center
+      // Create a new photon at center with two points for immediate trail visibility
+      const start = new THREE.Vector3(0, 0, 0);
+      const vel = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.1,
+        (Math.random() - 0.5) * 0.1,
+        (Math.random() - 0.5) * 0.1
+      );
+      const second = start.clone().add(vel.clone().multiplyScalar(0.01));
+      
       const newPhoton: PhotonData = {
         id: Date.now(),
         position: new THREE.Vector3(0, 0, 0),
-        velocity: new THREE.Vector3(
-          (Math.random() - 0.5) * 0.1,
-          (Math.random() - 0.5) * 0.1,
-          (Math.random() - 0.5) * 0.1
-        ),
-        path: [new THREE.Vector3(0, 0, 0)],
+        velocity: vel,
+        path: [start, second],
         isOutside: false,
         distanceFromCenter: 0,
       };
