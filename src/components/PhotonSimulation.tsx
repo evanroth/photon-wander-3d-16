@@ -63,7 +63,7 @@ function Photon({
     
     // Force initial path update if path is too short
     if (newPhoton.path.length < 2) {
-      newPhoton.path.push(newPhoton.position.clone());
+      newPhoton.path = [...newPhoton.path, newPhoton.position.clone()];
     }
 
     if (!newPhoton.isOutside) {
