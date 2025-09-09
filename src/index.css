@@ -1,0 +1,158 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Photon Simulation Design System - Warm Solar Theme */
+
+@layer base {
+  :root {
+    /* Solar background gradient */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --solar-inner: 51 100% 50%;    /* #ffe000 */
+    --solar-outer: 51 95% 85%;     /* #fefea4 */
+    
+    /* Photon path colors */
+    --photon-start: 16 94% 11%;    /* #370307 */
+    --photon-end: 21 86% 42%;      /* #c85e0a */
+    --photon-glow: 0 0% 100%;      /* pure white */
+    
+    /* UI colors */
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    
+    --primary: 51 100% 50%;
+    --primary-foreground: 16 94% 11%;
+    
+    --secondary: 51 30% 20%;
+    --secondary-foreground: 51 95% 85%;
+    
+    --muted: 51 20% 90%;
+    --muted-foreground: 51 30% 40%;
+    
+    --accent: 21 86% 42%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --border: 51 30% 80%;
+    --input: 51 20% 95%;
+    --ring: 51 100% 50%;
+    
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Maintain same solar theme in dark mode for consistency */
+    --background: 16 94% 5%;
+    --foreground: 51 95% 85%;
+    --solar-inner: 51 100% 50%;
+    --solar-outer: 51 95% 85%;
+    --photon-start: 16 94% 11%;
+    --photon-end: 21 86% 42%;
+    --photon-glow: 0 0% 100%;
+    
+    --card: 16 94% 8%;
+    --card-foreground: 51 95% 85%;
+    --popover: 16 94% 8%;
+    --popover-foreground: 51 95% 85%;
+    
+    --primary: 51 100% 50%;
+    --primary-foreground: 16 94% 11%;
+    
+    --secondary: 51 30% 15%;
+    --secondary-foreground: 51 95% 85%;
+    
+    --muted: 51 20% 10%;
+    --muted-foreground: 51 30% 60%;
+    
+    --accent: 21 86% 42%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --border: 51 30% 20%;
+    --input: 51 20% 15%;
+    --ring: 51 100% 50%;
+    --sidebar-background: 16 94% 5%;
+    --sidebar-foreground: 51 95% 85%;
+    --sidebar-primary: 51 100% 50%;
+    --sidebar-primary-foreground: 16 94% 11%;
+    --sidebar-accent: 51 30% 15%;
+    --sidebar-accent-foreground: 51 95% 85%;
+    --sidebar-border: 51 30% 20%;
+    --sidebar-ring: 51 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground overflow-hidden;
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+  }
+  
+  #root {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+@layer components {
+  .solar-gradient {
+    background: radial-gradient(
+      circle at center,
+      hsl(var(--solar-inner)) 0%,
+      hsl(var(--solar-outer)) 100%
+    );
+  }
+  
+  .control-panel {
+    @apply bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg;
+  }
+  
+  .control-button {
+    @apply w-12 h-12 rounded-full bg-background/80 backdrop-blur-sm border border-border shadow-md flex items-center justify-center hover:bg-accent/20 transition-all duration-200;
+  }
+  
+  .overlay-start {
+    @apply fixed inset-0 z-50 flex items-center justify-center cursor-pointer;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--solar-inner)) 0%,
+      hsl(var(--solar-outer)) 100%
+    );
+  }
+  
+  .sun-button {
+    @apply relative flex items-center justify-center transform transition-transform duration-300 hover:scale-105;
+  }
+}
