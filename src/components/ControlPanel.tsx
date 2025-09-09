@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Settings, RotateCcw, Plus, Play, Pause, Download } from "lucide-react";
+import { Settings, RotateCcw, Plus, Play, Pause, Volume2, VolumeX, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,8 @@ interface ControlPanelProps {
   maxPhotons: number;
   isPaused: boolean;
   onPauseToggle: () => void;
+  audioPlaying: boolean;
+  onAudioToggle: () => void;
 }
 
 export default function ControlPanel({
@@ -31,7 +33,9 @@ export default function ControlPanel({
   photonCount,
   maxPhotons,
   isPaused,
-  onPauseToggle
+  onPauseToggle,
+  audioPlaying,
+  onAudioToggle
 }: ControlPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [pulseAddButton, setPulseAddButton] = useState(false);
@@ -99,7 +103,7 @@ export default function ControlPanel({
                 value={[settings.photonSpeed]}
                 onValueChange={handleSliderChange('photonSpeed')}
                 min={0.1}
-                max={1.0}
+                max={27} // Increased to 3x original max (9 * 3 = 27)
                 step={0.1}
                 className="w-full"
               />
@@ -111,7 +115,7 @@ export default function ControlPanel({
                 value={[settings.stepDistance]}
                 onValueChange={handleSliderChange('stepDistance')}
                 min={0.05}
-                max={0.75}
+                max={8} // Increased to 4x original max (2 * 4 = 8)
                 step={0.01}
                 className="w-full"
               />
@@ -186,6 +190,16 @@ export default function ControlPanel({
           size="icon"
         >
           <Plus className="h-5 w-5" />
+        </Button>
+
+        {/* Audio Toggle Button */}
+        <Button
+          onClick={onAudioToggle}
+          className="control-button"
+          variant="ghost"
+          size="icon"
+        >
+          {audioPlaying ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
         </Button>
       </div>
     </div>

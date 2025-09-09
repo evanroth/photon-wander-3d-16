@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import PhotonSimulation from "@/components/PhotonSimulation";
 import ControlPanel from "@/components/ControlPanel";
+import AudioManager from "@/components/AudioManager";
 import StartOverlay from "@/components/StartOverlay";
 import * as THREE from "three";
 
@@ -21,8 +22,8 @@ interface PhotonTrail {
 const DEFAULT_SETTINGS = {
   rotationSpeed: 0.3,
   sphereTransparency: 0.4,
-  photonSpeed: 1.0, // Clamped to new max
-  stepDistance: 0.625, // Within new max of 0.75
+  photonSpeed: 1.0,
+  stepDistance: 0.625, // Increased by 25% from 0.5
   photonSize: 3,
 };
 
@@ -53,6 +54,7 @@ function createPhoton(): PhotonData {
 
 export default function Index() {
   const [started, setStarted] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false); // Default to off
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [photons, setPhotons] = useState<PhotonData[]>([createPhoton()]);
   const [trails, setTrails] = useState<PhotonTrail[]>([]);
@@ -60,7 +62,12 @@ export default function Index() {
 
   const handleStart = useCallback(() => {
     setStarted(true);
+    // Audio starts as off by default, user can toggle it manually
   }, []);
+
+  const handleAudioToggle = useCallback(() => {
+    setAudioPlaying(!audioPlaying);
+  }, [audioPlaying]);
 
   const handleReset = useCallback(() => {
     setPhotons([createPhoton()]);
@@ -80,9 +87,18 @@ export default function Index() {
     }
   }, []);
 
+  const handleAudioError = useCallback(() => {
+    setAudioPlaying(false);
+  }, []);
+
   return (
     <div className="w-full h-full relative overflow-hidden">
       {!started && <StartOverlay onStart={handleStart} />}
+      
+      <AudioManager 
+        isPlaying={audioPlaying} 
+        onError={handleAudioError}
+      />
       
       <PhotonSimulation
         settings={settings}
@@ -101,6 +117,8 @@ export default function Index() {
         maxPhotons={MAX_PHOTONS}
         isPaused={isPaused}
         onPauseToggle={() => setIsPaused(!isPaused)}
+        audioPlaying={audioPlaying}
+        onAudioToggle={handleAudioToggle}
       />
     </div>
   );
