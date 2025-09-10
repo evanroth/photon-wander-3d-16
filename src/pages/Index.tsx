@@ -1,8 +1,6 @@
 import { useState, useCallback } from "react";
 import PhotonSimulation from "@/components/PhotonSimulation";
 import ControlPanel from "@/components/ControlPanel";
-import AudioManager from "@/components/AudioManager";
-import StartOverlay from "@/components/StartOverlay";
 import * as THREE from "three";
 
 interface PhotonData {
@@ -53,21 +51,10 @@ function createPhoton(): PhotonData {
 }
 
 export default function Index() {
-  const [started, setStarted] = useState(false);
-  const [audioPlaying, setAudioPlaying] = useState(false); // Default to off
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [photons, setPhotons] = useState<PhotonData[]>([createPhoton()]);
   const [trails, setTrails] = useState<PhotonTrail[]>([]);
   const [isPaused, setIsPaused] = useState(false);
-
-  const handleStart = useCallback(() => {
-    setStarted(true);
-    // Audio starts as off by default, user can toggle it manually
-  }, []);
-
-  const handleAudioToggle = useCallback(() => {
-    setAudioPlaying(!audioPlaying);
-  }, [audioPlaying]);
 
   const handleReset = useCallback(() => {
     setPhotons([createPhoton()]);
@@ -87,19 +74,8 @@ export default function Index() {
     }
   }, []);
 
-  const handleAudioError = useCallback(() => {
-    setAudioPlaying(false);
-  }, []);
-
   return (
     <div className="w-full h-full relative overflow-hidden">
-      {!started && <StartOverlay onStart={handleStart} />}
-      
-      <AudioManager 
-        isPlaying={audioPlaying} 
-        onError={handleAudioError}
-      />
-      
       <PhotonSimulation
         settings={settings}
         photons={photons}
@@ -117,8 +93,6 @@ export default function Index() {
         maxPhotons={MAX_PHOTONS}
         isPaused={isPaused}
         onPauseToggle={() => setIsPaused(!isPaused)}
-        audioPlaying={audioPlaying}
-        onAudioToggle={handleAudioToggle}
       />
     </div>
   );

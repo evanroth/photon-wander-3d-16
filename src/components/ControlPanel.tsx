@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Settings, RotateCcw, Plus, Play, Pause, Volume2, VolumeX, Download } from "lucide-react";
+import { Settings, RotateCcw, Plus, Play, Pause, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -21,8 +21,6 @@ interface ControlPanelProps {
   maxPhotons: number;
   isPaused: boolean;
   onPauseToggle: () => void;
-  audioPlaying: boolean;
-  onAudioToggle: () => void;
 }
 
 export default function ControlPanel({
@@ -33,9 +31,7 @@ export default function ControlPanel({
   photonCount,
   maxPhotons,
   isPaused,
-  onPauseToggle,
-  audioPlaying,
-  onAudioToggle
+  onPauseToggle
 }: ControlPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [pulseAddButton, setPulseAddButton] = useState(false);
@@ -99,6 +95,9 @@ export default function ControlPanel({
 
             <div className="space-y-2">
               <Label className="text-sm font-medium">Photon Speed</Label>
+              <div className="text-xs text-muted-foreground mb-1">
+                Current: {settings.photonSpeed.toFixed(1)} | Max: 10.8
+              </div>
               <Slider
                 value={[settings.photonSpeed]}
                 onValueChange={handleSliderChange('photonSpeed')}
@@ -111,6 +110,9 @@ export default function ControlPanel({
 
             <div className="space-y-2">
               <Label className="text-sm font-medium">Step Distance</Label>
+              <div className="text-xs text-muted-foreground mb-1">
+                Current: {settings.stepDistance.toFixed(2)} | Max: 3.20
+              </div>
               <Slider
                 value={[settings.stepDistance]}
                 onValueChange={handleSliderChange('stepDistance')}
@@ -190,16 +192,6 @@ export default function ControlPanel({
           size="icon"
         >
           <Plus className="h-5 w-5" />
-        </Button>
-
-        {/* Audio Toggle Button */}
-        <Button
-          onClick={onAudioToggle}
-          className="control-button"
-          variant="ghost"
-          size="icon"
-        >
-          {audioPlaying ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
         </Button>
       </div>
     </div>
