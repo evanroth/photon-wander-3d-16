@@ -103,7 +103,7 @@ export default function ControlPanel({
                 value={[settings.photonSpeed]}
                 onValueChange={handleSliderChange('photonSpeed')}
                 min={0.1}
-                max={27} // Increased to 3x original max (9 * 3 = 27)
+                max={10.8} // Reduced by 60% from 27
                 step={0.1}
                 className="w-full"
               />
@@ -115,7 +115,7 @@ export default function ControlPanel({
                 value={[settings.stepDistance]}
                 onValueChange={handleSliderChange('stepDistance')}
                 min={0.05}
-                max={8} // Increased to 4x original max (2 * 4 = 8)
+                max={3.2} // Reduced by 60% from 8
                 step={0.01}
                 className="w-full"
               />
