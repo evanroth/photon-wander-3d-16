@@ -4,6 +4,17 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { GLTFExporter } from "three-stdlib";
 
+// Helper function to convert trail path into tube mesh for export
+function addTrailMesh(group: THREE.Group, path: THREE.Vector3[], radius = 0.01) {
+  if (!path || path.length < 2) return;
+  const curve = new THREE.CatmullRomCurve3(path);
+  const tubularSegments = Math.min(2000, path.length * 2);
+  const tube = new THREE.TubeGeometry(curve, tubularSegments, radius, 8, false);
+  const material = new THREE.MeshBasicMaterial({ color: 0xc85e0a });
+  const mesh = new THREE.Mesh(tube, material);
+  group.add(mesh);
+}
+
 interface PhotonData {
   id: number;
   position: THREE.Vector3;
@@ -331,26 +342,45 @@ function Scene({ settings, photons, trails, isPaused, onPhotonsUpdate, cameraDis
   const orbitRef = useRef<any>();
   const [isUserControlling, setIsUserControlling] = useState(false);
 
-  // Function to export 3D scene as GLB
+  // Function to export 3D scene as GLB with trail meshes
   const export3D = useCallback(() => {
+    const exportGroup = new THREE.Group();
+
+    // Sphere (export as a simple mesh)
+    const sphereGeo = new THREE.SphereGeometry(SPHERE_RADIUS, 32, 32);
+    const sphereMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+    exportGroup.add(new THREE.Mesh(sphereGeo, sphereMat));
+
+    // Trails (completed)
+    trails.forEach(trail => {
+      addTrailMesh(exportGroup, trail.path, settings.photonSize * 0.002);
+    });
+
+    // Active photons' current paths
+    photons.forEach(photon => {
+      addTrailMesh(exportGroup, photon.path, settings.photonSize * 0.002);
+    });
+
+    exportGroup.updateMatrixWorld(true);
+
     const exporter = new GLTFExporter();
     exporter.parse(
-      scene,
+      exportGroup,
       (result) => {
-        const blob = new Blob([result as ArrayBuffer], { type: 'application/octet-stream' });
+        const blob = new Blob([result as ArrayBuffer], { type: "model/gltf-binary" });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = url;
-        link.download = 'photon-simulation.glb';
+        link.download = "photon-simulation.glb";
         link.click();
         URL.revokeObjectURL(url);
       },
       (error) => {
         console.error('Export failed:', error);
       },
-      { binary: true }
+      { binary: true, onlyVisible: true }
     );
-  }, [scene]);
+  }, [photons, trails, settings.photonSize]);
 
   // Expose export function globally
   useEffect(() => {
