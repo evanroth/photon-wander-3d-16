@@ -111,13 +111,13 @@ export default function ControlPanel({
             <div className="space-y-2">
               <Label className="text-sm font-medium">Step Distance</Label>
               <div className="text-xs text-muted-foreground mb-1">
-                Current: {settings.stepDistance.toFixed(2)} | Max: 3.20
+                Current: {settings.stepDistance.toFixed(2)} | Max: 1.50
               </div>
               <Slider
                 value={[settings.stepDistance]}
                 onValueChange={handleSliderChange('stepDistance')}
                 min={0.05}
-                max={3.2} // Reduced by 60% from 8
+                max={1.5}
                 step={0.01}
                 className="w-full"
               />
