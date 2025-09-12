@@ -242,8 +242,9 @@ function Photon({
     geometry.computeBoundingSphere();
   }, [photon.path.length]);
 
-  // Apply audio wobble effect
+  // Apply audio wobble effect in a separate useFrame hook
   useFrame((state) => {
+    // Early exit if audio is not active or required refs are not available
     if (!isAudioActive || !positionsRef.current || !originalPositionsRef.current) return;
     if (sphereExitIndexRef.current < 0) return;
     
