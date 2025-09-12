@@ -36,11 +36,14 @@ interface PhotonSimulationProps {
     photonSpeed: number;
     stepDistance: number;
     photonSize: number;
+    audioWobbleAmount: number;
   };
   photons: PhotonData[];
   trails: PhotonTrail[];
   isPaused: boolean;
   onPhotonsUpdate: (photons: PhotonData[], completedTrails?: PhotonTrail[]) => void;
+  audioLevel: number;
+  isAudioActive: boolean;
 }
 
 interface SceneProps extends PhotonSimulationProps {
@@ -48,7 +51,7 @@ interface SceneProps extends PhotonSimulationProps {
 }
 
 const SPHERE_RADIUS = 3.5; // Increased from 2.5
-const MAX_DISTANCE = 25;
+const MAX_DISTANCE = 32.5; // Increased by 30% for longer straight sections
 const MAX_TRAIL_SEGMENTS = 2000;
 const DISTANCE_THRESHOLD = 0.1; // Increased from 0.05
 
@@ -56,12 +59,16 @@ function Photon({
   photon, 
   settings, 
   isPaused,
-  onUpdate 
+  onUpdate,
+  audioLevel,
+  isAudioActive
 }: { 
   photon: PhotonData; 
   settings: PhotonSimulationProps['settings'];
   isPaused: boolean;
   onUpdate: (photon: PhotonData) => void;
+  audioLevel: number;
+  isAudioActive: boolean;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const pathGroupRef = useRef<THREE.Group>(null);
@@ -122,6 +129,8 @@ function Photon({
   const positionsRef = useRef<Float32Array>();
   const geometryRef = useRef<THREE.BufferGeometry>();
   const materialRef = useRef<THREE.LineBasicMaterial>();
+  const originalPositionsRef = useRef<Float32Array>();
+  const sphereExitIndexRef = useRef<number>(-1);
 
   // Initialize line object once
   useEffect(() => {
@@ -163,6 +172,16 @@ function Photon({
     
     const segmentCount = Math.min(pts.length - 1, MAX_TRAIL_SEGMENTS);
     
+    // Find sphere exit point
+    let sphereExitIndex = -1;
+    for (let i = 0; i < pts.length; i++) {
+      if (pts[i].length() > SPHERE_RADIUS) {
+        sphereExitIndex = i;
+        break;
+      }
+    }
+    sphereExitIndexRef.current = sphereExitIndex;
+    
     for (let i = 0; i < segmentCount; i++) {
       const start = pts[i];
       const end = pts[i + 1];
@@ -177,7 +196,7 @@ function Photon({
       positions[offset + 4] = end.y;
       positions[offset + 5] = end.z;
       
-      // Set colors
+      // Set colors with enhanced fade for straight sections
       const distanceFromCenter = start.length();
       let color: THREE.Color;
       
@@ -190,8 +209,16 @@ function Photon({
         );
       } else {
         color = new THREE.Color(0xc85e0a);
-        const fadeDistance = Math.max(0, (distanceFromCenter - SPHERE_RADIUS) / 10);
-        const fade = Math.max(0.1, Math.exp(-fadeDistance));
+        const fadeDistance = Math.max(0, (distanceFromCenter - SPHERE_RADIUS) / 12);
+        let fade = Math.max(0.05, Math.exp(-fadeDistance * 1.5)); // Enhanced fade
+        
+        // Additional fade for far end of straight sections
+        if (sphereExitIndex >= 0 && i >= sphereExitIndex) {
+          const straightProgress = (i - sphereExitIndex) / Math.max(1, segmentCount - sphereExitIndex);
+          const endFade = Math.max(0.1, 1 - Math.pow(straightProgress, 2));
+          fade *= endFade;
+        }
+        
         color.multiplyScalar(fade);
       }
       
@@ -203,11 +230,94 @@ function Photon({
       colorAttribute.array[colorOffset + 5] = color.b;
     }
     
+    // Store original positions for wobble effect
+    if (!originalPositionsRef.current) {
+      originalPositionsRef.current = new Float32Array(positions.length);
+    }
+    originalPositionsRef.current.set(positions);
+    
     geometry.setDrawRange(0, segmentCount * 2);
     geometry.attributes.position.needsUpdate = true;
     geometry.attributes.color.needsUpdate = true;
     geometry.computeBoundingSphere();
   }, [photon.path.length]);
+
+  // Apply audio wobble effect
+  useFrame((state) => {
+    if (!isAudioActive || !positionsRef.current || !originalPositionsRef.current) return;
+    if (sphereExitIndexRef.current < 0) return;
+    
+    const positions = positionsRef.current;
+    const originalPositions = originalPositionsRef.current;
+    const geometry = geometryRef.current;
+    const pts = photon.path;
+    
+    if (!geometry || pts.length < 2) return;
+    
+    const segmentCount = Math.min(pts.length - 1, MAX_TRAIL_SEGMENTS);
+    const wobbleAmplitude = settings.audioWobbleAmount * audioLevel * 0.15;
+    const time = state.clock.elapsedTime;
+    const seed = photon.id * 0.1; // Unique seed per photon
+    
+    let hasChanges = false;
+    
+    for (let i = sphereExitIndexRef.current; i < segmentCount; i++) {
+      const offset = i * 6;
+      
+      // Check if this is a straight section by comparing direction consistency
+      if (i < pts.length - 2) {
+        const dir1 = new THREE.Vector3(
+          pts[i + 1].x - pts[i].x,
+          pts[i + 1].y - pts[i].y,
+          pts[i + 1].z - pts[i].z
+        ).normalize();
+        
+        const dir2 = new THREE.Vector3(
+          pts[i + 2].x - pts[i + 1].x,
+          pts[i + 2].y - pts[i + 1].y,
+          pts[i + 2].z - pts[i + 1].z
+        ).normalize();
+        
+        // If directions are similar (dot product > 0.95), apply wobble
+        if (dir1.dot(dir2) > 0.95) {
+          // Calculate perpendicular offset
+          const up = new THREE.Vector3(0, 1, 0);
+          const perp1 = new THREE.Vector3().crossVectors(dir1, up).normalize();
+          const perp2 = new THREE.Vector3().crossVectors(dir1, perp1).normalize();
+          
+          const wobble1 = Math.sin(time * 2 + seed + i * 0.5) * wobbleAmplitude;
+          const wobble2 = Math.cos(time * 1.5 + seed + i * 0.3) * wobbleAmplitude * 0.7;
+          
+          const wobbleOffset = perp1.clone().multiplyScalar(wobble1)
+            .add(perp2.clone().multiplyScalar(wobble2));
+          
+          // Apply wobble to both start and end points of the segment
+          positions[offset] = originalPositions[offset] + wobbleOffset.x;
+          positions[offset + 1] = originalPositions[offset + 1] + wobbleOffset.y;
+          positions[offset + 2] = originalPositions[offset + 2] + wobbleOffset.z;
+          positions[offset + 3] = originalPositions[offset + 3] + wobbleOffset.x;
+          positions[offset + 4] = originalPositions[offset + 4] + wobbleOffset.y;
+          positions[offset + 5] = originalPositions[offset + 5] + wobbleOffset.z;
+          
+          hasChanges = true;
+        }
+      }
+    }
+    
+    if (hasChanges) {
+      geometry.attributes.position.needsUpdate = true;
+    }
+  });
+  
+  // Reset positions when audio is turned off
+  useEffect(() => {
+    if (!isAudioActive && positionsRef.current && originalPositionsRef.current) {
+      positionsRef.current.set(originalPositionsRef.current);
+      if (geometryRef.current) {
+        geometryRef.current.attributes.position.needsUpdate = true;
+      }
+    }
+  }, [isAudioActive]);
 
   return (
     <group>
@@ -337,7 +447,7 @@ function TrailRenderer({ trail, settings }: { trail: PhotonTrail; settings: Phot
   return <group>{lineRef.current && <primitive object={lineRef.current} />}</group>;
 }
 
-function Scene({ settings, photons, trails, isPaused, onPhotonsUpdate, cameraDistance }: SceneProps) {
+function Scene({ settings, photons, trails, isPaused, onPhotonsUpdate, cameraDistance, audioLevel, isAudioActive }: SceneProps) {
   const { camera, scene, gl } = useThree();
   const orbitRef = useRef<any>();
   const [isUserControlling, setIsUserControlling] = useState(false);
@@ -485,6 +595,8 @@ function Scene({ settings, photons, trails, isPaused, onPhotonsUpdate, cameraDis
           settings={settings}
           isPaused={isPaused}
           onUpdate={handlePhotonUpdate}
+          audioLevel={audioLevel}
+          isAudioActive={isAudioActive}
         />
       ))}
       
@@ -493,7 +605,7 @@ function Scene({ settings, photons, trails, isPaused, onPhotonsUpdate, cameraDis
   );
 }
 
-export default function PhotonSimulation({ settings, photons, trails, isPaused, onPhotonsUpdate }: PhotonSimulationProps) {
+export default function PhotonSimulation({ settings, photons, trails, isPaused, onPhotonsUpdate, audioLevel, isAudioActive }: PhotonSimulationProps) {
   const [cameraDistance, setCameraDistance] = useState(10); // Increased to show full sphere initially
 
   const handleZoomIn = () => setCameraDistance(prev => Math.max(5, prev - 0.5));
@@ -519,6 +631,8 @@ export default function PhotonSimulation({ settings, photons, trails, isPaused, 
           isPaused={isPaused}
           onPhotonsUpdate={onPhotonsUpdate} 
           cameraDistance={cameraDistance}
+          audioLevel={audioLevel}
+          isAudioActive={isAudioActive}
         />
       </Canvas>
       

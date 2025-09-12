@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import PhotonSimulation from "@/components/PhotonSimulation";
 import ControlPanel from "@/components/ControlPanel";
+import MicButton from "@/components/MicButton";
+import { useAudioWobble } from "@/hooks/useAudioWobble";
 import * as THREE from "three";
 
 interface PhotonData {
@@ -23,6 +25,7 @@ const DEFAULT_SETTINGS = {
   photonSpeed: 1.0,
   stepDistance: 0.625, // Increased by 25% from 0.5
   photonSize: 3,
+  audioWobbleAmount: 0.25,
 };
 
 const MAX_PHOTONS = 8;
@@ -55,6 +58,7 @@ export default function Index() {
   const [photons, setPhotons] = useState<PhotonData[]>([createPhoton()]);
   const [trails, setTrails] = useState<PhotonTrail[]>([]);
   const [isPaused, setIsPaused] = useState(false);
+  const { isActive: isAudioActive, audioLevel, toggleMic, error } = useAudioWobble();
 
   const handleReset = useCallback(() => {
     setPhotons([createPhoton()]);
@@ -82,6 +86,14 @@ export default function Index() {
         trails={trails}
         isPaused={isPaused}
         onPhotonsUpdate={handlePhotonsUpdate}
+        audioLevel={audioLevel}
+        isAudioActive={isAudioActive}
+      />
+      
+      <MicButton
+        isActive={isAudioActive}
+        onToggle={toggleMic}
+        error={error}
       />
       
       <ControlPanel

@@ -10,6 +10,7 @@ interface Settings {
   photonSpeed: number;
   stepDistance: number;
   photonSize: number;
+  audioWobbleAmount: number;
 }
 
 interface ControlPanelProps {
@@ -64,7 +65,7 @@ export default function ControlPanel({
   };
 
   return (
-    <div className="fixed bottom-6 left-6 flex items-end gap-3 z-10">
+    <div className="fixed bottom-6 left-20 flex items-end gap-3 z-10">
       {/* Settings Panel */}
       {isOpen && (
         <div className="control-panel p-6 w-80 max-h-96 overflow-y-auto">
@@ -131,6 +132,18 @@ export default function ControlPanel({
                 min={1}
                 max={12}
                 step={0.5}
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Audio Wobble Amount</Label>
+              <Slider
+                value={[settings.audioWobbleAmount]}
+                onValueChange={handleSliderChange('audioWobbleAmount')}
+                min={0}
+                max={1}
+                step={0.05}
                 className="w-full"
               />
             </div>
