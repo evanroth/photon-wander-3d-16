@@ -256,7 +256,7 @@ function Photon({
     if (!geometry || pts.length < 2) return;
     
     const segmentCount = Math.min(pts.length - 1, MAX_TRAIL_SEGMENTS);
-    const wobbleAmplitude = settings.audioWobbleAmount * audioLevel * 0.15;
+    const wobbleAmplitude = settings.audioWobbleAmount * audioLevel * 0.6;
     const time = state.clock.elapsedTime;
     const seed = photon.id * 0.1; // Unique seed per photon
     
@@ -279,8 +279,8 @@ function Photon({
           pts[i + 2].z - pts[i + 1].z
         ).normalize();
         
-        // If directions are similar (dot product > 0.95), apply wobble
-        if (dir1.dot(dir2) > 0.95) {
+        // If directions are similar (dot product > 0.9), apply wobble
+        if (dir1.dot(dir2) > 0.9) {
           // Calculate perpendicular offset
           const up = new THREE.Vector3(0, 1, 0);
           const perp1 = new THREE.Vector3().crossVectors(dir1, up).normalize();
